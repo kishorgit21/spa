@@ -114,6 +114,9 @@ class DatabaseHelper {
             startDate TEXT NOT NULL,                        -- Start date of the financial year, stored as a string (e.g., 'YYYY-MM-DD')
             endDate TEXT NOT NULL,                           -- End date of the financial year, stored as a string (e.g., 'YYYY-MM-DD')
             isOnline INTEGER DEFAULT 0,                     -- Indicates if the school is online (0 = false, 1 = true) 
+            paymentId TEXT,
+            orderId TEXT,
+            signature TEXT
             createdDate TEXT DEFAULT CURRENT_TIMESTAMP      -- Automatically set to current date and time on insertion
           )
         ''');
@@ -155,22 +158,32 @@ class DatabaseHelper {
     }
   }
 
-  Future<void> insertProfile(List<Map<String, dynamic>> records) async {
+  Future<List<Map<String, dynamic>>> insertProfile(
+      List<Map<String, dynamic>> records) async {
     var mobileNumber = records.first['mobileNumber'].toString();
     var email = records.first['email'].toString();
 
     final db = await database;
+    List<Map<String, dynamic>> updatedOrInsertedRecords = [];
+
     List<Map<String, dynamic>> existingRecord =
         await getProfile(mobileNumber, email);
 
     await db.transaction((txn) async {
       if (existingRecord.isEmpty) {
         for (var record in records) {
-          await txn.insert(
+          int id = await txn.insert(
             'SchoolProfile',
             record,
             conflictAlgorithm: ConflictAlgorithm.replace,
           );
+          // Fetch the newly inserted record
+          final insertedRecord = await txn.query(
+            'SchoolProfile',
+            where: 'rowid = ?',
+            whereArgs: [id],
+          );
+          updatedOrInsertedRecords.addAll(insertedRecord);
         }
       } else {
         // Update the existing record for this receivedDate
@@ -182,9 +195,17 @@ class DatabaseHelper {
                 'mobileNumber = ? AND email = ?', // Update based on the received_date
             whereArgs: [mobileNumber, email],
           );
+          // Fetch the updated record
+          final updatedRecord = await txn.query(
+            'SchoolProfile',
+            where: 'mobileNumber = ? AND email = ?',
+            whereArgs: [mobileNumber, email],
+          );
+          updatedOrInsertedRecords.addAll(updatedRecord);
         }
       }
     });
+    return updatedOrInsertedRecords;
   }
 
   Future<int> insert(Map<String, dynamic> row) async {
@@ -195,11 +216,11 @@ class DatabaseHelper {
   Future<void> insertOpeningStock(List<Map<String, dynamic>> records) async {
     Database db = await instance.database;
     var classValue = records.first['class'].toString();
-    
+
     List<Map<String, dynamic>> existingRecord =
         await getOpeningStock(classValue);
 
-     await db.transaction((txn) async {
+    await db.transaction((txn) async {
       if (existingRecord.isEmpty) {
         for (var record in records) {
           await txn.insert(
@@ -219,8 +240,8 @@ class DatabaseHelper {
           );
         }
       }
-    }); 
-}
+    });
+  }
 
   Future<List<Map<String, dynamic>>> getElements() async {
     final db = await database;
@@ -247,7 +268,7 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> getOpeningStockO() async {
     final db = await database; // Assuming you have a database getter
-      return await db.rawQuery('''
+    return await db.rawQuery('''
     SELECT * 
     FROM OpeningStock
     ORDER BY created_date DESC
@@ -255,7 +276,7 @@ class DatabaseHelper {
   ''');
   }
 
-Future<List<Map<String, dynamic>>> getOpeningStock(
+  Future<List<Map<String, dynamic>>> getOpeningStock(
       String? selectedClass) async {
     final db = await database;
     if (selectedClass == null || selectedClass.isEmpty) {
@@ -268,7 +289,8 @@ Future<List<Map<String, dynamic>>> getOpeningStock(
     );
   }
 
-  Future<List<Map<String, dynamic>>> getAllRiceGrainRecord(String? selectedClass) async {
+  Future<List<Map<String, dynamic>>> getAllRiceGrainRecord(
+      String? selectedClass) async {
     final db = await database;
     return await db.query(
       'RiceGrainRecord',
@@ -278,16 +300,17 @@ Future<List<Map<String, dynamic>>> getOpeningStock(
   }
 
   Future<List<Map<String, dynamic>>> getRiceGrainRecord(
-      String selectedDate,String? selectedClass) async {
+      String selectedDate, String? selectedClass) async {
     final db = await database;
-    if (selectedDate.isEmpty && (selectedClass == null || selectedClass.isEmpty)) {
+    if (selectedDate.isEmpty &&
+        (selectedClass == null || selectedClass.isEmpty)) {
       return [];
     }
 
     return await db.query(
       'RiceGrainRecord',
       where: 'received_date = ? AND class = ?',
-      whereArgs: [selectedDate,selectedClass],
+      whereArgs: [selectedDate, selectedClass],
     );
   }
 
@@ -358,7 +381,6 @@ Future<List<Map<String, dynamic>>> getOpeningStock(
     );
   }
 
-
   Future<List<Map<String, dynamic>>> getAllRiceGrainsPerStudentRecord() async {
     final db = await database;
     return await db.query(
@@ -372,7 +394,7 @@ Future<List<Map<String, dynamic>>> getOpeningStock(
     var classValue = records.first['class'].toString();
     final db = await database;
     List<Map<String, dynamic>> existingRecord =
-        await getRiceGrainRecord(receivedDate,classValue);
+        await getRiceGrainRecord(receivedDate, classValue);
 
     await db.transaction((txn) async {
       if (existingRecord.isEmpty) {
@@ -391,7 +413,7 @@ Future<List<Map<String, dynamic>>> getOpeningStock(
             record,
             where:
                 'received_date = ? AND itemid = ? AND class= ?', // Update based on the received_date
-            whereArgs: [receivedDate, record.values.elementAt(1),classValue],
+            whereArgs: [receivedDate, record.values.elementAt(1), classValue],
           );
         }
       }

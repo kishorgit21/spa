@@ -6,6 +6,10 @@ import 'package:spa/logToFile.dart';
 import 'package:android_id/android_id.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:io'; // Required to check platform
+import 'package:spa/main.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'dart:math';
+import 'package:spa/order_api.dart';
 
 class ProfileForm extends StatefulWidget {
   const ProfileForm({super.key});
@@ -15,6 +19,7 @@ class ProfileForm extends StatefulWidget {
 }
 
 class _ProfileFormState extends State<ProfileForm> {
+  late Razorpay _razorpay;
   bool _isSaving = false;
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _schoolNameController = TextEditingController();
@@ -33,10 +38,20 @@ class _ProfileFormState extends State<ProfileForm> {
   String? _deviceId;
   // Date formatter
   String _formatDate(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
+
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay(); // Initialize Razorpay
     _loadProfile();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear(); // Dispose Razorpay when not needed
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -160,12 +175,12 @@ class _ProfileFormState extends State<ProfileForm> {
 
   Future<void> _submitProfile(bool isOnline) async {
     List<Map<String, dynamic>> records = [];
-    try {
-      setState(() {
-        _isSaving = true; // Show loading indicator
-      });
-      if (_formKey.currentState?.validate() ?? false) {
-        //Prepare data to insert
+
+    if (_formKey.currentState?.validate() ?? false) {
+      try {
+        setState(() {
+          _isSaving = true; // Show loading indicator
+        }); //Prepare data to insert
         records.add({
           'schoolName': sanitizeHtml(sanitizeInput(_schoolNameController.text)),
           'udiseCode': _udiseController.text,
@@ -181,21 +196,126 @@ class _ProfileFormState extends State<ProfileForm> {
         });
 
         // Insert data into the database
-        await DatabaseHelper.instance.insertProfile(records);
+        var profile = await DatabaseHelper.instance.insertProfile(records);
+        bool isPaymentPending =
+            profile.any((record) => record['paymentId'] == null);
+
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile created successfully')),
+          SnackBar(
+            content: Text('Profile created successfully'),
+            action: isPaymentPending
+                ? SnackBarAction(
+                    label: 'Payment',
+                    onPressed: _showRazorpayPayment, // Trigger Razorpay payment
+                  )
+                : null, // Disable the action if paymentId is not null
+          ),
         );
-      } else {
+      } catch (error) {
+        logMessage('Failed to save profile: $error');
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please correct the errors')),
+          SnackBar(content: Text('Failed to save profile: $error')),
         );
+      } finally {
+        setState(() {
+          _isSaving = false;
+        });
       }
-    } catch (error) {
-      logMessage("Failed to save profile: $error");
-    } finally {
-      setState(() {
-        _isSaving = false; // Hide loading indicator
-      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please correct the errors')),
+      );
+    }
+  }
+
+// Razorpay payment handlers
+  void _handlePaymentSuccess(PaymentSuccessResponse response) {
+    _updateProfilePayment(
+        response.paymentId, response.orderId, response.signature);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Payment successful!')),
+    );
+    Navigator.of(context).pushReplacement(MaterialPageRoute(
+      builder: (context) => HomeScreen(),
+    ));
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    String errorMessage = response.code == Razorpay.PAYMENT_CANCELLED
+        ? 'Payment canceled by user'
+        : 'Payment failed: ${response.message}';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(errorMessage)),
+    );
+  }
+
+//signature = hmac_sha256(order_id + "|" + payment_id, secret_key)
+
+  Future<String> createOrder(int amount) async {
+    String orderID = await OrderAPI.generateOrderID(amount);
+    return orderID;
+  }
+
+  Future<void> _showRazorpayPayment() async {
+    int amount = 52000;
+    String orderId = await createOrder(amount);
+    var options = {
+      'key':
+          'rzp_test_dwzzI6TiwTr1yA', // Replace with your actual Razorpay API key
+      'order_id': orderId,
+      'name': 'SPA',
+      'description': 'Registration Fee',
+      'timeout': 300, // Optional timeout in seconds
+      'prefill': {
+        'contact': '9860317030',
+        'email': 'kishor.kamat21@gmail.com',
+      },
+      'theme': {
+        'color': '#F37254', // Optional color customization
+      },
+    };
+
+    try {
+      _razorpay.open(options);
+    } catch (e) {
+      logMessage('Error opening Razorpay: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error opening payment gateway: $e')),
+      );
+    }
+  }
+
+  Future<void> _updateProfilePayment(
+      String? paymentId, String? orderId, String? signature) async {
+    List<Map<String, dynamic>> records = [];
+
+    if (_formKey.currentState?.validate() ?? false) {
+      try {
+        setState(() {
+          _isSaving = true; // Show loading indicator
+        }); //Prepare data to insert
+        records.add({
+          'schoolName': sanitizeHtml(sanitizeInput(_schoolNameController.text)),
+          'udiseCode': _udiseController.text,
+          'city': sanitizeHtml(sanitizeInput(_cityController.text)),
+          'taluka': _talukaController.text,
+          'district': _districtController.text,
+          'principalName': _principalNameController.text,
+          'mobileNumber': _mobileController.text,
+          'email': _emailController.text,
+          'startDate': _startDateController.text,
+          'endDate': _endDateController.text,
+          'paymentId': paymentId,
+          'orderId': orderId,
+          'signature': signature
+        });
+
+        // Insert data into the database
+        await DatabaseHelper.instance.insertProfile(records);
+      } catch (e) {
+        logMessage("Failed to update payment details:: $e");
+      }
     }
   }
 

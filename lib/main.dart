@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+//import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spa/balance_form.dart';
 import 'package:spa/profile.dart';
 import 'package:spa/rice_grain_record_form.dart';
@@ -9,6 +10,7 @@ import 'package:spa/logviewer.dart';
 import 'package:spa/monthlyreport_form.dart';
 //import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:spa/logToFile.dart';
 
 void main() async {
   // Initialize locale data
@@ -16,11 +18,24 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   //await DatabaseHelper.instance.resetDatabase();
   await DatabaseHelper().database; // Initialize the database
-  runApp(const ShaleyaPoshanApp());
+  bool isProfileComplete = await _checkProfileCompletion();
+  runApp(ShaleyaPoshanApp(isProfileComplete: isProfileComplete));
+}
+
+Future<bool> _checkProfileCompletion() async {
+  try {
+    List<Map<String, dynamic>> rows =
+        await DatabaseHelper.instance.getProfiles();
+    return rows.isNotEmpty;
+  } catch (error) {
+    logMessage("Failed to load Profile: $error");
+  }
+  return false;
 }
 
 class ShaleyaPoshanApp extends StatelessWidget {
-  const ShaleyaPoshanApp({super.key});
+  final bool isProfileComplete;
+  const ShaleyaPoshanApp({super.key, required this.isProfileComplete});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -68,7 +83,7 @@ class ShaleyaPoshanApp extends StatelessWidget {
           bodyMedium: TextStyle(fontSize: 14, color: Colors.black87),
         ),
       ),
-      home: const HomeScreen(),
+      home: isProfileComplete ? const HomeScreen() : const ProfileForm(),
     );
   }
 }
@@ -93,6 +108,17 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  Future<bool> _checkProfileCompletion() async {
+    try {
+      List<Map<String, dynamic>> rows =
+          await DatabaseHelper.instance.getProfiles();
+      return rows.isNotEmpty;
+    } catch (error) {
+      logMessage("Failed to load Profile: $error");
+    }
+    return false;
   }
 
   @override
