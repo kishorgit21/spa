@@ -11,6 +11,7 @@ import 'package:spa/monthlyreport_form.dart';
 //import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:spa/logToFile.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   // Initialize locale data
@@ -18,6 +19,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   //await DatabaseHelper.instance.resetDatabase();
   await DatabaseHelper().database; // Initialize the database
+  await dotenv.load(fileName: "assets/config/.env");
   bool isProfileComplete = await _checkProfileCompletion();
   runApp(ShaleyaPoshanApp(isProfileComplete: isProfileComplete));
 }

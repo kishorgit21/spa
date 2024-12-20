@@ -160,14 +160,10 @@ class DatabaseHelper {
 
   Future<List<Map<String, dynamic>>> insertProfile(
       List<Map<String, dynamic>> records) async {
-    var mobileNumber = records.first['mobileNumber'].toString();
-    var email = records.first['email'].toString();
-
     final db = await database;
     List<Map<String, dynamic>> updatedOrInsertedRecords = [];
 
-    List<Map<String, dynamic>> existingRecord =
-        await getProfile(mobileNumber, email);
+    List<Map<String, dynamic>> existingRecord = await getProfiles();
 
     await db.transaction((txn) async {
       if (existingRecord.isEmpty) {
@@ -186,20 +182,20 @@ class DatabaseHelper {
           updatedOrInsertedRecords.addAll(insertedRecord);
         }
       } else {
+        int id = existingRecord.first['id'];
         // Update the existing record for this receivedDate
         for (var record in records) {
           await txn.update(
             'SchoolProfile',
             record,
-            where:
-                'mobileNumber = ? AND email = ?', // Update based on the received_date
-            whereArgs: [mobileNumber, email],
+            where: 'id = ?', // Update based on the received_date
+            whereArgs: [id],
           );
           // Fetch the updated record
           final updatedRecord = await txn.query(
             'SchoolProfile',
-            where: 'mobileNumber = ? AND email = ?',
-            whereArgs: [mobileNumber, email],
+            where: 'id = ?',
+            whereArgs: [id],
           );
           updatedOrInsertedRecords.addAll(updatedRecord);
         }

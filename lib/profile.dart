@@ -10,6 +10,7 @@ import 'package:spa/main.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'dart:math';
 import 'package:spa/order_api.dart';
+import 'package:spa/api_services.dart';
 
 class ProfileForm extends StatefulWidget {
   const ProfileForm({super.key});
@@ -36,6 +37,7 @@ class _ProfileFormState extends State<ProfileForm> {
   DateTime? _startDate;
   DateTime? _endDate;
   String? _deviceId;
+  int? _Id;
   // Date formatter
   String _formatDate(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
@@ -61,7 +63,7 @@ class _ProfileFormState extends State<ProfileForm> {
       if (rows.isNotEmpty && rows.isNotEmpty) {
         // Assuming there's only one profile to load (as the profile form is for a single profile)
         var row = rows.first;
-
+        _Id = row['id'] ?? '';
         // Set values from the database to the controllers
         _schoolNameController.text = row['schoolName'] ?? '';
         _udiseController.text = row['udiseCode'] ?? '';
@@ -148,27 +150,62 @@ class _ProfileFormState extends State<ProfileForm> {
           deviceid: _deviceId,
           email: _emailController.text,
           mobile: _mobileController.text,
-          active: true,
+          active: false,
           finyearstartdate: _startDateController.text,
           finyearenddate: _endDateController.text,
         );
 
         // Call the ApiServices saveSPAUserModel function with the user object
-        // ApiServices apiServices = ApiServices();
-        // SPAUserModel? result = await apiServices.saveSPAUserModel(user);
+        ApiServices apiServices = ApiServices();
+        SPAUserModel? result = await apiServices.saveSPAUserModel(user);
 
-        // // Check if the user was saved successfully
-        // if (result != null) {
-        //   logMessage("SPA user created successfully!");
-        return true;
-        // } else {
-        //   logMessage("Failed to save SPA user");
-        //   return false;
-        // }
+        // Check if the user was saved successfully
+        if (result != null) {
+          logMessage("SPA user created successfully!");
+          return true;
+        } else {
+          logMessage("Failed to save SPA user");
+          return false;
+        }
       }
       return false;
     } catch (error) {
       logMessage("Failed to save SPA Profile: $error");
+    }
+    return false;
+  }
+
+  Future<bool> _updateSPAUser(
+      String? paymentId, String? orderId, String? signature) async {
+    try {
+      if (_formKey.currentState?.validate() ?? false) {
+        SPAUserModel user = SPAUserModel(
+            deviceid: _deviceId,
+            email: _emailController.text,
+            mobile: _mobileController.text,
+            active: true,
+            finyearstartdate: _startDateController.text,
+            finyearenddate: _endDateController.text,
+            paymentId: paymentId,
+            orderId: orderId,
+            signature: signature);
+
+        // Call the ApiServices saveSPAUserModel function with the user object
+        ApiServices apiServices = ApiServices();
+        SPAUserModel? result = await apiServices.saveSPAUserModel(user);
+
+        // Check if the user was saved successfully
+        if (result != null) {
+          logMessage("SPA user updated successfully!");
+          return true;
+        } else {
+          logMessage("Failed to update SPA user");
+          return false;
+        }
+      }
+      return false;
+    } catch (error) {
+      logMessage("Failed to update SPA Profile: $error");
     }
     return false;
   }
@@ -232,6 +269,7 @@ class _ProfileFormState extends State<ProfileForm> {
   void _handlePaymentSuccess(PaymentSuccessResponse response) {
     _updateProfilePayment(
         response.paymentId, response.orderId, response.signature);
+    _updateSPAUser(response.paymentId, response.orderId, response.signature);
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Payment successful!')),
@@ -258,30 +296,21 @@ class _ProfileFormState extends State<ProfileForm> {
   }
 
   Future<void> _showRazorpayPayment() async {
-    int amount = 52000;
+    int amount = OrderAPI.amount;
     String orderId = await createOrder(amount);
-    var options = {
-      'key':
-          'rzp_test_dwzzI6TiwTr1yA', // Replace with your actual Razorpay API key
-      'order_id': orderId,
-      'name': 'SPA',
-      'description': 'Registration Fee',
-      'timeout': 300, // Optional timeout in seconds
-      'prefill': {
-        'contact': '9860317030',
-        'email': 'kishor.kamat21@gmail.com',
-      },
-      'theme': {
-        'color': '#F37254', // Optional color customization
-      },
-    };
-
-    try {
-      _razorpay.open(options);
-    } catch (e) {
-      logMessage('Error opening Razorpay: $e');
+    if (orderId.isNotEmpty) {
+      var options = await OrderAPI.getRazorpayOptions(orderId);
+      try {
+        _razorpay.open(options);
+      } catch (e) {
+        logMessage('Error opening Razorpay: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening payment gateway: $e')),
+        );
+      }
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error opening payment gateway: $e')),
+        SnackBar(content: Text('Order ID not generated: $e')),
       );
     }
   }

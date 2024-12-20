@@ -59,6 +59,13 @@ class _AttendanceFormState extends State<AttendanceForm> {
         selectedDate = picked;
         selectedDayController.text = DateFormat('EEEE', 'mr_IN').format(picked);
         _clearForm();
+        if (selectedClass != null) {
+          _getAttendance(
+            DateFormat('dd-MM-yyyy').format(selectedDate),
+            selectedDayController.text,
+            selectedClass,
+          );
+        }
       });
     }
   }
@@ -138,7 +145,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
       List<Map<String, dynamic>> rows = await DatabaseHelper.instance
           .getAttendance(selectedDate, selectedDay, selectedClass);
 
-      if (rows.isNotEmpty && rows.isNotEmpty) {
+      if (rows.isNotEmpty) {
         final attendanceData = rows.first;
         setState(() {
           boysController.text = attendanceData['boys'].toString();

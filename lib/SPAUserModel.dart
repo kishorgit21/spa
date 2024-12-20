@@ -5,14 +5,19 @@ class SPAUserModel {
   bool? active;
   String? finyearstartdate;
   String? finyearenddate;
-
+  String? paymentId;
+  String? orderId;
+  String? signature;
   SPAUserModel(
       {this.deviceid,
       this.email,
       this.mobile,
       this.active,
       this.finyearstartdate,
-      this.finyearenddate});
+      this.finyearenddate,
+      this.paymentId,
+      this.orderId,
+      this.signature});
 
   SPAUserModel.fromJson(Map<String, dynamic> json) {
     deviceid = json['deviceid'];
@@ -21,6 +26,9 @@ class SPAUserModel {
     active = json['active'];
     finyearstartdate = json['finyearstartdate'];
     finyearenddate = json['finyearenddate'];
+    paymentId = json['paymentId'];
+    orderId = json['orderId'];
+    signature = json['signature'];
   }
 
   Map<String, dynamic> toJson() {
@@ -31,6 +39,9 @@ class SPAUserModel {
     data['active'] = active;
     data['finyearstartdate'] = finyearstartdate;
     data['finyearenddate'] = finyearenddate;
+    data['paymentId'] = paymentId;
+    data['orderId'] = orderId;
+    data['signature'] = signature;
     return data;
   }
 }
