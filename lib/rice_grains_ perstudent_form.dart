@@ -147,6 +147,13 @@ class _RiceGrainsPerStudentFormState extends State<RiceGrainsPerStudentForm> {
                 child: ListView.builder(
                   itemCount: _items.length,
                   itemBuilder: (context, index) {
+                    // Determine which value to use based on selected class
+                    String weightLabel = 'वजन (kg)';
+                    if (_selectedClass == '१ ते ५') {
+                      weightLabel += ' ${_items[index]['onetofive']} 🔔';
+                    } else if (_selectedClass == '६ ते ८') {
+                      weightLabel += ' ${_items[index]['sixtoeight']} 🔔';
+                    }
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Row(
@@ -163,8 +170,8 @@ class _RiceGrainsPerStudentFormState extends State<RiceGrainsPerStudentForm> {
                             child: TextFormField(
                               controller: _controllers[index],
                               keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: 'वजन (kg gm)',
+                              decoration: InputDecoration(
+                                labelText: weightLabel,
                                 border: OutlineInputBorder(),
                               ),
                               validator: (value) {

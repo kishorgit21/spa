@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'database_helper.dart';
 import 'package:spa/logToFile.dart';
+import 'package:spa/excel_utils.dart';
+import 'package:spa/calculateDailyExpenses.dart';
 
 class AttendanceForm extends StatefulWidget {
   const AttendanceForm({super.key});
@@ -15,8 +17,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   DateTime selectedDate = DateTime.now();
   String selectedDay = '';
-  final TextEditingController boysController = TextEditingController();
-  final TextEditingController girlsController = TextEditingController();
+  final TextEditingController patController = TextEditingController();
   final TextEditingController totalController = TextEditingController();
   final TextEditingController selectedDayController = TextEditingController();
   Map<String, dynamic>? selectedItem;
@@ -41,8 +42,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
   @override
   void dispose() {
     selectedDayController.dispose();
-    boysController.dispose();
-    girlsController.dispose();
+    patController.dispose();
     totalController.dispose();
     super.dispose();
   }
@@ -70,11 +70,11 @@ class _AttendanceFormState extends State<AttendanceForm> {
     }
   }
 
-  void _updateTotal(String value) {
-    final int boys = int.tryParse(boysController.text) ?? 0;
-    final int girls = int.tryParse(girlsController.text) ?? 0;
-    totalController.text = (boys + girls).toString();
-  }
+  // void _updateTotal(String value) {
+  //   final int boys = int.tryParse(boysController.text) ?? 0;
+  //   final int girls = int.tryParse(girlsController.text) ?? 0;
+  //   totalController.text = (boys + girls).toString();
+  // }
 
   Future<void> _loadItems() async {
     List<Map<String, dynamic>> items =
@@ -86,40 +86,165 @@ class _AttendanceFormState extends State<AttendanceForm> {
 
   Future<void> _submitForm() async {
     try {
-      List<Map<String, dynamic>> records = [];
-      if (_formKey.currentState?.validate() ?? false) {
-        // Prepare data to insert
-        records.add({
+      if (!(_formKey.currentState?.validate() ?? false)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please correct the errors')),
+        );
+        return;
+      }
+
+      List<Map<String, dynamic>> attendanceRecords = _prepareFormRecords();
+
+      // Check if the selected date is the last day of the month
+      if (_isEndOfMonth(selectedDate)) {
+        bool shouldTransfer = await _showTransferConfirmationDialog();
+        if (shouldTransfer) {
+          await _handleEndOfMonthTransfer();
+        }
+      }
+      // Insert data into the database
+      await DatabaseHelper.instance.insertAttendance(attendanceRecords);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Attendance saved successfully"),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      await checkInsertedData();
+      _clearForm();
+    } catch (error, stackTrace) {
+      logMessage("Failed to save the Attendance Form: $error\n$stackTrace");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("An error occurred: $error"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleEndOfMonthTransfer() async {
+    try {
+      String nextDay = DateFormat('yyyy-MM-dd').format(
+        selectedDate.add(const Duration(days: 1)),
+      );
+      String? formattedDate =
+          formatToMonthYear(DateFormat('dd-MM-yyyy').format(selectedDate));
+
+      CalculateDailyExpenses calculateDailyExpenses =
+          const CalculateDailyExpenses();
+      List<Map<String, dynamic>> dailyExpenses =
+          await calculateDailyExpenses.calculateDailyExpenses(formattedDate);
+
+      // Validate daily expenses list
+      if (dailyExpenses.isEmpty) {
+        throw Exception("Daily expenses data is empty.");
+      }
+
+      List<Map<String, dynamic>> filteredData = dailyExpenses
+          .where((data) =>
+              data["class"] == selectedClass.toString() &&
+              data["itemName"] != '')
+          .toList();
+
+      var result = await ExcelUtils.populateSheetData(selectedClass.toString(),
+          filteredData, calculateDailyExpenses, formattedDate);
+
+      // Validate result list
+      if (result.isEmpty) {
+        throw Exception("No data found in the Excel result.");
+      }
+
+      List<Map<String, dynamic>> _items =
+          await DatabaseHelper.instance.getElements();
+
+      // Validate items list
+      if (_items.isEmpty) {
+        throw Exception("No items found in the database.");
+      }
+
+      List<List<dynamic>> filteredRows =
+          result.where((row) => row.isNotEmpty && row[0] == "शिल्लक").toList();
+
+      // Validate filteredRows list
+      if (filteredRows.isEmpty || filteredRows[0].length < 4) {
+        throw Exception("Invalid or incomplete 'शिल्लक' data.");
+      }
+
+      await _insertOpeningStock(filteredRows, _items, nextDay);
+    } catch (error, stackTrace) {
+      logMessage("Failed to handle end-of-month transfer: $error\n$stackTrace");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error during end-of-month transfer: $error"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _insertOpeningStock(List<List<dynamic>> filteredRows,
+      List<Map<String, dynamic>> items, String nextDay) async {
+    try {
+      List<Map<String, dynamic>> nextMonthOpeningStock = [];
+      for (int i = 0; i < items.length; i++) {
+        // Validate filteredRows before accessing
+        if (filteredRows[0].length <= i + 3) {
+          throw Exception("Insufficient data in 'शिल्लक' for item index $i.");
+        }
+
+        String weight = filteredRows[0][i + 3];
+        nextMonthOpeningStock.add({
+          'class': selectedClass.toString(),
+          'itemid': items[i]['itemid'],
+          'name': items[i]['name'],
+          'weight': weight,
+          'created_date': nextDay,
+        });
+      }
+
+      // Insert into the database
+      await DatabaseHelper.instance.insertOpeningStock(nextMonthOpeningStock);
+    } catch (error, stackTrace) {
+      logMessage("Failed to insert opening stock: $error\n$stackTrace");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error inserting opening stock"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  bool _isEndOfMonth(DateTime date) {
+    try {
+      DateTime nextDay = date.add(const Duration(days: 1));
+      return nextDay.month != date.month;
+    } catch (error, stackTrace) {
+      logMessage("Error checking end of month: $error\n$stackTrace");
+      return false;
+    }
+  }
+
+  List<Map<String, dynamic>> _prepareFormRecords() {
+    try {
+      return [
+        {
           'date': DateFormat('dd-MM-yyyy').format(selectedDate),
           'day': selectedDayController.text,
           'class': selectedClass,
-          'boys': int.tryParse(boysController.text) ?? 0,
-          'girls': int.tryParse(girlsController.text) ?? 0,
+          'pat': int.tryParse(patController.text) ?? 0,
           'total': int.tryParse(totalController.text) ?? 0,
           'itemid': selectedItem?['itemid'] ?? 0,
           'name': selectedItem?['name'] ?? '',
           'created_date':
-              DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now())
-        });
-
-        // Insert data into the database
-        await DatabaseHelper.instance.insertAttendance(records);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("'Data saved successfully'"),
-            backgroundColor: Colors.blue,
-            duration: Duration(seconds: 2),
-          ),
-        );
-        await checkInsertedData();
-        _clearForm();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please correct the errors')),
-        );
-      }
-    } catch (error) {
-      logMessage("Failed to save the Attendance Form: $error");
+              DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now()),
+        }
+      ];
+    } catch (error, stackTrace) {
+      logMessage("Error preparing form records: $error\n$stackTrace");
+      return [];
     }
   }
 
@@ -129,11 +254,70 @@ class _AttendanceFormState extends State<AttendanceForm> {
     print(rows);
   }
 
+  String formatToMonthYear(String date) {
+    try {
+      // Parse the input date string
+      DateTime parsedDate = DateFormat('dd-MM-yyyy').parse(date);
+      // Format it to "MMMM yyyy"
+      return DateFormat('MMMM yyyy').format(parsedDate);
+    } catch (e) {
+      print('Error formatting date: $e');
+      return '';
+    }
+  }
+
+  Future<bool> _showTransferConfirmationDialog() async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('स्मरणपत्र'),
+              content: const Text(
+                  'आजचा दिनांक महिन्याचा शेवटचा दिवस आहे. उर्वरित शिल्लक पुढील महिन्यात हस्तांतरित करायचे आहे का?'),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(false); // User chooses 'No'
+                  },
+                  child: const Text('नाही'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(true); // User chooses 'Yes'
+                  },
+                  child: const Text('हो'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false; // Default to false if dialog is dismissed
+  }
+
+  Future<void> _transferRemainingBalanceToNextMonth() async {
+    try {
+      // Implement the logic to transfer the remaining balance to the next financial year
+      //await DatabaseHelper.instance.transferBalanceToNextYear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Remaining balance transferred to the next month.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to transfer balance.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
 // Clear the form fields after successful submission
   void _clearForm() {
     setState(() {
-      boysController.clear();
-      girlsController.clear();
+      patController.clear();
       totalController.clear();
       dropdownValue = null;
       selectedItem = null;
@@ -148,8 +332,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
       if (rows.isNotEmpty) {
         final attendanceData = rows.first;
         setState(() {
-          boysController.text = attendanceData['boys'].toString();
-          girlsController.text = attendanceData['girls'].toString();
+          patController.text = attendanceData['pat'].toString();
           totalController.text = attendanceData['total'].toString();
           selectedItem = {
             'itemid': attendanceData['itemid'],
@@ -286,14 +469,11 @@ class _AttendanceFormState extends State<AttendanceForm> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                _buildTextField(boysController, 'उपस्थिती (मुले)'),
+                _buildTextField(patController, 'पट'),
                 const SizedBox(height: 16),
-                _buildTextField(girlsController, 'उपस्थिती (मुली)'),
-                const SizedBox(height: 16),
-                _buildTextField(totalController, 'एकूण', readOnly: true),
-                const SizedBox(height: 16),
+                _buildTextField(totalController, 'उपस्थिती'),
                 Wrap(
-                  spacing: 8.0,
+                  spacing: 10.0,
                   children: [
                     const Text(
                       'शिजवून दिलेली डाळ / कडधान्य निवडा: ',
@@ -370,7 +550,6 @@ class _AttendanceFormState extends State<AttendanceForm> {
         }
         return null;
       },
-      onChanged: _updateTotal,
     );
   }
 }

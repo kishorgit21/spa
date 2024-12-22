@@ -34,9 +34,30 @@ android {
         release {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.debug
+            //signingConfig = signingConfigs.debug
+             // Enable minification and resource shrinking for release build
+            minifyEnabled true
+            shrinkResources true
+
+            // Add ProGuard configuration
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+
+            // If you are using signing configurations, make sure to add your own signing config
+            signingConfig signingConfigs.debug
+            //signingConfig signingConfigs.release
         }
     }
+    
+    lintOptions {
+        checkReleaseBuilds false // Add this block to fix the lint issue
+    }
+
+    dependencies {
+    implementation 'com.razorpay:checkout:1.6.21' // Use the latest version
+    //classpath 'com.android.tools.build:gradle:8.2.0'
+
+}
+
 }
 
 flutter {

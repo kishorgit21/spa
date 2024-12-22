@@ -39,7 +39,7 @@ class _BalanceFormState extends State<BalanceForm> {
   Future<void> _loadExistingData(String? selectedClass) async {
     try {
       List<Map<String, dynamic>> rows =
-          await DatabaseHelper.instance.getOpeningStock(selectedClass);
+          await DatabaseHelper.instance.getLastOpeningStock(selectedClass);
       if (rows.isNotEmpty) {
         for (var row in rows) {
           int index =
@@ -98,7 +98,7 @@ class _BalanceFormState extends State<BalanceForm> {
 
   Future<void> _checkInsertedData() async {
     List<Map<String, dynamic>> rows =
-        await DatabaseHelper.instance.getOpeningStock(_selectedClass);
+        await DatabaseHelper.instance.getLastOpeningStock(_selectedClass);
     print(rows);
   }
 
@@ -158,7 +158,7 @@ class _BalanceFormState extends State<BalanceForm> {
                               controller: _controllers[index],
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
-                                labelText: 'वजन (kg gm)',
+                                labelText: 'वजन (kg)',
                                 border: OutlineInputBorder(),
                               ),
                               validator: (value) {

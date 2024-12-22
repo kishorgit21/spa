@@ -1,9 +1,9 @@
 class ExcelUtils {
   static Future<List<List<dynamic>>> populateSheetData(
-    String sheetName,
-    List<Map<String, dynamic>> data,
-    dynamic calculateDailyExpenses,
-  ) async {
+      String sheetName,
+      List<Map<String, dynamic>> data,
+      dynamic calculateDailyExpenses,
+      String? selectedMonth) async {
     // Initialize the rows list
     List<List<dynamic>> rows = [];
 
@@ -27,7 +27,8 @@ class ExcelUtils {
     rows.add(headers);
 
     // Add balance rows
-    var balanceTotal = await calculateDailyExpenses.balanceTotal(sheetName);
+    var balanceTotal =
+        await calculateDailyExpenses.balanceTotal(sheetName, selectedMonth);
     List<String> balanceLabels = ["मागील शिल्लक", "चालु महा.जमा", "एकुण"];
     if (balanceTotal.isEmpty) return [];
     for (int i = 0; i < balanceLabels.length; i++) {

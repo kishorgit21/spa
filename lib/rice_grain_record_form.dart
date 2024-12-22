@@ -213,7 +213,7 @@ class _RiceGrainRecordFormState extends State<RiceGrainRecordForm> {
                               controller: _controllers[index],
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
-                                labelText: 'वजन (kg gm)',
+                                labelText: 'वजन (kg)',
                                 border: OutlineInputBorder(),
                               ),
                               validator: (value) {

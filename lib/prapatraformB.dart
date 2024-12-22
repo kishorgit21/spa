@@ -149,11 +149,14 @@ class _PraPatraFormB extends State<PraPatraFormB> {
     }
   }
 
-  Future<void> populateSheet(excel.Sheet sheet, List<Map<String, dynamic>> data,
-      CalculateDailyExpenses calculateDailyExpenses) async {
+  Future<void> populateSheet(
+    excel.Sheet sheet,
+    List<Map<String, dynamic>> data,
+    CalculateDailyExpenses calculateDailyExpenses,
+  ) async {
     try {
       var result = await ExcelUtils.populateSheetData(
-          sheet.sheetName, data, calculateDailyExpenses);
+          sheet.sheetName, data, calculateDailyExpenses, _selectedMonth);
       if (result.isEmpty) return;
       String schoolName = "शाळेचे नाव : ${await SchoolName()}";
 

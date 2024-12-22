@@ -48,7 +48,9 @@ class DatabaseHelper {
     await db.execute('''
       CREATE TABLE Elements (
         itemid INTEGER PRIMARY KEY,
-        name TEXT
+        name TEXT,
+        onetofive TEXT,
+        sixtoeight TEXT
       )
     ''');
 
@@ -58,8 +60,7 @@ class DatabaseHelper {
         date TEXT,
         day  TEXT,
         class TEXT,
-        boys INTEGER,
-        girls INTEGER,
+        pat INTEGER,
         total INTEGER,	
         itemid INTEGER,
         name TEXT,
@@ -129,23 +130,72 @@ class DatabaseHelper {
     // Check if the table already has data
     List<Map<String, dynamic>> existingItems = await db.query('elements');
     if (existingItems.isNotEmpty) return;
-
     final List<Map<String, dynamic>> defaultItems = [
-      {"itemid": 1, "name": "तांदूळ"},
-      {"itemid": 2, "name": "मुगडाळ"},
-      {"itemid": 3, "name": "तूरडाळ"},
-      {"itemid": 4, "name": "मसूरडाळ"},
-      {"itemid": 5, "name": "मटकी"},
-      {"itemid": 6, "name": "वाटाणा"},
-      {"itemid": 7, "name": "हरभरा"},
-      {"itemid": 8, "name": "हिरवा मूग"},
-      {"itemid": 9, "name": "चवळी"},
-      {"itemid": 10, "name": "मोहरी"},
-      {"itemid": 11, "name": "जिरे"},
-      {"itemid": 12, "name": "हळद"},
-      {"itemid": 13, "name": "तिखट"},
-      {"itemid": 14, "name": "तेल"},
-      {"itemid": 15, "name": "मीठ"},
+      {"itemid": 1, "name": "तांदूळ", "onetofive": "0.1", "sixtoeight": "0.15"},
+      {
+        "itemid": 2,
+        "name": "मुगडाळ",
+        "onetofive": "0.02",
+        "sixtoeight": "0.03"
+      },
+      {
+        "itemid": 3,
+        "name": "तूरडाळ",
+        "onetofive": "0.02",
+        "sixtoeight": "0.03"
+      },
+      {
+        "itemid": 4,
+        "name": "मसूरडाळ",
+        "onetofive": "0.02",
+        "sixtoeight": "0.03"
+      },
+      {"itemid": 5, "name": "मटकी", "onetofive": "0.02", "sixtoeight": "0.03"},
+      {
+        "itemid": 6,
+        "name": "वाटाणा",
+        "onetofive": "0.02",
+        "sixtoeight": "0.03"
+      },
+      {"itemid": 7, "name": "हरभरा", "onetofive": "0.02", "sixtoeight": "0.03"},
+      {
+        "itemid": 8,
+        "name": "हिरवा मूग",
+        "onetofive": "0.02",
+        "sixtoeight": "0.03"
+      },
+      {"itemid": 9, "name": "चवळी", "onetofive": "0.02", "sixtoeight": "0.03"},
+      {
+        "itemid": 10,
+        "name": "मोहरी",
+        "onetofive": "0.0001",
+        "sixtoeight": "0.0002"
+      },
+      {
+        "itemid": 11,
+        "name": "जिरे",
+        "onetofive": "0.0001",
+        "sixtoeight": "0.0002"
+      },
+      {
+        "itemid": 12,
+        "name": "हळद",
+        "onetofive": "0.00015",
+        "sixtoeight": "0.0002"
+      },
+      {
+        "itemid": 13,
+        "name": "तिखट",
+        "onetofive": "0.001",
+        "sixtoeight": "0.002"
+      },
+      {
+        "itemid": 14,
+        "name": "तेल",
+        "onetofive": "0.005",
+        "sixtoeight": "0.0075"
+      },
+      {"itemid": 15, "name": "मीठ", "onetofive": "0.002", "sixtoeight": "0.003"}
     ];
 
     // Insert each default item
@@ -212,9 +262,15 @@ class DatabaseHelper {
   Future<void> insertOpeningStock(List<Map<String, dynamic>> records) async {
     Database db = await instance.database;
     var classValue = records.first['class'].toString();
+    var selecteddate = records.first['created_date'].toString();
+    var englishFormatter = DateFormat('MMMM yyyy', 'en');
+    DateTime date = DateTime.parse(
+        selecteddate); // Parse the date string to a DateTime object
+    DateTime month = DateTime(date.year, date.month + 1); // Increment month
+    String selectedMonth = englishFormatter.format(month); // Ensure `englis
 
     List<Map<String, dynamic>> existingRecord =
-        await getOpeningStock(classValue);
+        await getOpeningStock(classValue, selectedMonth);
 
     await db.transaction((txn) async {
       if (existingRecord.isEmpty) {
@@ -262,36 +318,46 @@ class DatabaseHelper {
     );
   }
 
-  Future<List<Map<String, dynamic>>> getOpeningStockO() async {
+  Future<List<Map<String, dynamic>>> getLastOpeningStock(
+      String? selectedClass) async {
     final db = await database; // Assuming you have a database getter
     return await db.rawQuery('''
-    SELECT * 
-    FROM OpeningStock
-    ORDER BY created_date DESC
-    LIMIT 15
-  ''');
+      SELECT * 
+      FROM OpeningStock
+      WHERE class = ?
+      ORDER BY created_date DESC
+      LIMIT 15
+    ''', [selectedClass]);
   }
 
   Future<List<Map<String, dynamic>>> getOpeningStock(
-      String? selectedClass) async {
+      String? selectedClass, String? selectedMonth) async {
     final db = await database;
     if (selectedClass == null || selectedClass.isEmpty) {
       return [];
     }
+    Map<String, String>? dates = getMonthStartAndEndDate(selectedMonth);
+    String startDate = dates?['startDate'] ?? '';
+    String endDate = dates?['endDate'] ?? '';
+
     return await db.query(
       'OpeningStock',
-      where: 'class = ?',
-      whereArgs: [selectedClass],
+      where: "class = ? AND date(created_date) BETWEEN ? AND ?",
+      whereArgs: [selectedClass, startDate, endDate],
     );
   }
 
   Future<List<Map<String, dynamic>>> getAllRiceGrainRecord(
-      String? selectedClass) async {
+      String? selectedClass, String? selectedMonth) async {
     final db = await database;
+    Map<String, String>? dates = getMonthStartAndEndDate(selectedMonth);
+    String startDate = dates?['startDate'] ?? '';
+    String endDate = dates?['endDate'] ?? '';
+
     return await db.query(
       'RiceGrainRecord',
-      where: 'class = ?',
-      whereArgs: [selectedClass],
+      where: "class = ? AND date(received_date) BETWEEN ? AND ?",
+      whereArgs: [selectedClass, startDate, endDate],
     );
   }
 
@@ -477,6 +543,32 @@ class DatabaseHelper {
         }
       }
     });
+  }
+
+  Map<String, String>? getMonthStartAndEndDate(String? selectedMonth) {
+    try {
+      if (selectedMonth == null || selectedMonth.isEmpty) {
+        print("Invalid input: selectedMonth is null or empty.");
+        return null;
+      }
+      // Split the input to extract month name and year
+      List<String> parts = selectedMonth.split(" ");
+      String monthName = parts[0];
+      int year = int.parse(parts[1]);
+
+      // Convert the month name to its corresponding number
+      int month = DateFormat('MMMM').parse(monthName).month;
+
+      // Construct the start and end dates
+      String startDate = "$year-${month.toString().padLeft(2, '0')}-01";
+      String endDate =
+          DateTime(year, month + 1, 0).toIso8601String().split("T")[0];
+
+      return {'startDate': startDate, 'endDate': endDate};
+    } catch (e) {
+      throw Exception(
+          "Invalid input. Please provide input in 'Month Year' format.");
+    }
   }
 
   Future close() async {

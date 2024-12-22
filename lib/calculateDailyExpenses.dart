@@ -9,7 +9,6 @@ class CalculateDailyExpenses {
     List<Map<String, dynamic>> dailyExpenses = [];
     List<Map<String, dynamic>> attendanceData = [];
     List<Map<String, dynamic>> riceGrainsPerStudentData = [];
-    List<Map<String, dynamic>> balanceTotalData = [];
     try {
       // Fetch attendance data asynchronously
       attendanceData =
@@ -37,12 +36,12 @@ class CalculateDailyExpenses {
 
         // Check if the balance for this class is already cached
         if (!balanceCache.containsKey(dayClass)) {
-          balanceCache[dayClass] = await balanceTotal(dayClass);
+          balanceCache[dayClass] = await balanceTotal(dayClass, selectedMonth);
         }
 
         // Use the cached balance data
         var balanceTotalData = balanceCache[dayClass]!;
-
+        if (balanceTotalData.isEmpty) return [];
         for (var item in classWiseData) {
           int itemId = item['itemid'];
           String itemName = item['name'];
@@ -110,16 +109,17 @@ class CalculateDailyExpenses {
     return dailyExpenses;
   }
 
-  Future<List<Map<String, dynamic>>> balanceTotal(String? selectedClass) async {
+  Future<List<Map<String, dynamic>>> balanceTotal(
+      String? selectedClass, String? selectedMonth) async {
     List<Map<String, dynamic>> openingBalance = [];
     List<Map<String, dynamic>> currentBalance = [];
     List<Map<String, dynamic>> balanceTotal = [];
 
     try {
-      openingBalance =
-          await DatabaseHelper.instance.getOpeningStock(selectedClass);
-      currentBalance =
-          await DatabaseHelper.instance.getAllRiceGrainRecord(selectedClass);
+      openingBalance = await DatabaseHelper.instance
+          .getOpeningStock(selectedClass, selectedMonth);
+      currentBalance = await DatabaseHelper.instance
+          .getAllRiceGrainRecord(selectedClass, selectedMonth);
       if (openingBalance.isEmpty || currentBalance.isEmpty) {
         logMessage("No data available for balanceTotal.");
         return [];

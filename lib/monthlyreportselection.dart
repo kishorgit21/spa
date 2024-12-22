@@ -193,8 +193,8 @@ class MdmRegExportFormState extends State<MdmRegExportForm> {
     }
 
     // Add balance rows
-    var balanceTotal =
-        await calculateDailyExpenses.balanceTotal(sheet.sheetName);
+    var balanceTotal = await calculateDailyExpenses.balanceTotal(
+        sheet.sheetName, _selectedMonth);
     List<String> balanceLabels = ["मागील शिल्लक", "चालु महा.जमा", "एकुण"];
     if (balanceTotal.isEmpty) return;
 
