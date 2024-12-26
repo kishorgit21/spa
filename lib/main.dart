@@ -12,6 +12,9 @@ import 'package:spa/monthlyreport_form.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:spa/logToFile.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:spa/api_services.dart';
+import 'package:spa/deviceInfo.dart';
+import 'package:spa/SPAUserModel.dart';
 
 void main() async {
   // Initialize locale data
@@ -26,9 +29,15 @@ void main() async {
 
 Future<bool> _checkProfileCompletion() async {
   try {
-    List<Map<String, dynamic>> rows =
-        await DatabaseHelper.instance.getProfiles();
-    return rows.isNotEmpty;
+    String? deviceId = await Deviceinfo.getDeviceId();
+
+    ApiServices apiServices = ApiServices();
+    SPAUserModel? result = await apiServices.fetchSPAUser(deviceId);
+    if (result != null && result.paymentId != null) {
+      List<Map<String, dynamic>> rows =
+          await DatabaseHelper.instance.getProfiles();
+      return rows.isNotEmpty;
+    }
   } catch (error) {
     logMessage("Failed to load Profile: $error");
   }
@@ -205,11 +214,9 @@ class RecordScreen extends StatelessWidget {
       children: [
         _buildGridItem(Icons.list, 'आरंभीची शिल्लक नोंदवा', context),
         _buildGridItem(Icons.person, 'दैनिक उपस्थिती नोंदवा', context),
-        _buildGridItem(
-            Icons.shopping_cart, 'प्राप्त तांदूळ व धान्य नोंद करा', context),
+        _buildGridItem(Icons.shopping_cart, 'प्राप्त धान्य नोंद करा', context),
         _buildGridItem(Icons.people, 'विद्यार्थी पट नोंदवा', context),
-        _buildGridItem(
-            Icons.calculate, 'तांदूळ व धान्याचे प्रमाण नोंदवा', context),
+        _buildGridItem(Icons.calculate, 'धान्याचे प्रमाण नोंदवा', context),
         _buildGridItem(Icons.info, 'आमच्या विषयी', context),
       ],
     );
@@ -224,13 +231,13 @@ class RecordScreen extends StatelessWidget {
             context,
             MaterialPageRoute(builder: (context) => const BalanceForm()),
           );
-        } else if (title == 'प्राप्त तांदूळ व धान्य नोंद करा') {
+        } else if (title == 'प्राप्त धान्य नोंद करा') {
           Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (context) => const RiceGrainRecordForm()),
           );
-        } else if (title == 'तांदूळ व धान्याचे प्रमाण नोंदवा') {
+        } else if (title == 'धान्याचे प्रमाण नोंदवा') {
           Navigator.push(
             context,
             MaterialPageRoute(

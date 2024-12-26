@@ -25,6 +25,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
   List<Map<String, dynamic>> _items = [];
   final List<String> classes = ['१ ते ५', '६ ते ८']; // Class options
   String? selectedClass; // Variable to store selected class
+  bool isConfigured = false; // Initialize as part of the state
 
   @override
   void initState() {
@@ -95,14 +96,6 @@ class _AttendanceFormState extends State<AttendanceForm> {
 
       List<Map<String, dynamic>> attendanceRecords = _prepareFormRecords();
 
-      // Check if the selected date is the last day of the month
-      if (_isEndOfMonth(selectedDate)) {
-        bool shouldTransfer = await _showTransferConfirmationDialog();
-        if (shouldTransfer) {
-          await _handleEndOfMonthTransfer();
-        }
-      }
-      // Insert data into the database
       await DatabaseHelper.instance.insertAttendance(attendanceRecords);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -111,6 +104,14 @@ class _AttendanceFormState extends State<AttendanceForm> {
           duration: Duration(seconds: 2),
         ),
       );
+      // Check if the selected date is the last day of the month
+      if (_isEndOfMonth(selectedDate)) {
+        bool shouldTransfer = await _showTransferConfirmationDialog();
+        if (shouldTransfer) {
+          await _handleEndOfMonthTransfer();
+        }
+      }
+
       await checkInsertedData();
       _clearForm();
     } catch (error, stackTrace) {
@@ -173,6 +174,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
       }
 
       await _insertOpeningStock(filteredRows, _items, nextDay);
+      _transferRemainingBalanceToNextMonth();
     } catch (error, stackTrace) {
       logMessage("Failed to handle end-of-month transfer: $error\n$stackTrace");
       ScaffoldMessenger.of(context).showSnackBar(
@@ -349,12 +351,17 @@ class _AttendanceFormState extends State<AttendanceForm> {
     }
   }
 
-  Future<bool> _checkPerStudentConfiguration(String? selectedClass) async {
+  Future<bool> _checkConfiguration(String? selectedClass) async {
     try {
       if (selectedClass == null || selectedClass.isEmpty) return false;
-      List<Map<String, dynamic>> rows = await DatabaseHelper.instance
+      List<Map<String, dynamic>> perStudentRecord = await DatabaseHelper
+          .instance
           .getRiceGrainsPerStudentRecord(selectedClass);
-      if (rows.isNotEmpty) {
+
+      List<Map<String, dynamic>> openingStock =
+          await DatabaseHelper.instance.getLastOpeningStock(selectedClass);
+
+      if (perStudentRecord.isNotEmpty && openingStock.isNotEmpty) {
         return true;
       }
     } catch (error) {
@@ -429,15 +436,19 @@ class _AttendanceFormState extends State<AttendanceForm> {
                       });
 
                       // Simulate a check for per-student configuration
-                      bool isConfigured =
-                          await _checkPerStudentConfiguration(selectedClass);
 
-                      if (!isConfigured) {
+                      bool configurationResult =
+                          await _checkConfiguration(selectedClass);
+                      setState(() {
+                        isConfigured = !configurationResult;
+                      });
+
+                      if (isConfigured) {
                         _clearForm();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
-                                'Per-student configuration not found for class $selectedClass'),
+                                'Configuration not found for class $selectedClass'),
                             backgroundColor: Colors.red,
                           ),
                         );
@@ -510,7 +521,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
                 const SizedBox(height: 24),
                 Center(
                   child: ElevatedButton(
-                    onPressed: _submitForm,
+                    onPressed: isConfigured ? null : _submitForm,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 32, vertical: 16),

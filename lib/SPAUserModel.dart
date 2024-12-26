@@ -20,15 +20,15 @@ class SPAUserModel {
       this.signature});
 
   SPAUserModel.fromJson(Map<String, dynamic> json) {
-    deviceid = json['deviceid'];
-    email = json['email'];
-    mobile = json['mobile'];
-    active = json['active'];
-    finyearstartdate = json['finyearstartdate'];
-    finyearenddate = json['finyearenddate'];
-    paymentId = json['paymentId'];
-    orderId = json['orderId'];
-    signature = json['signature'];
+    deviceid = json['deviceid'] ?? '';
+    email = json['email'] ?? '';
+    mobile = json['mobile'] ?? '';
+    active = json['active'] == null ? null : json['active'] == 1;
+    finyearstartdate = json['finyearstartdate'] ?? '';
+    finyearenddate = json['finyearenddate'] ?? '';
+    paymentId = json['paymentId'] ?? '';
+    orderId = json['orderId'] ?? '';
+    signature = json['signature'] ?? '';
   }
 
   Map<String, dynamic> toJson() {

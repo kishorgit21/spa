@@ -111,7 +111,7 @@ class _RiceGrainsPerStudentFormState extends State<RiceGrainsPerStudentForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('प्रति विद्यार्थी तांदूळ व धान्याचे प्रमाण'),
+        title: const Text('प्रति विद्यार्थी धान्याचे प्रमाण'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

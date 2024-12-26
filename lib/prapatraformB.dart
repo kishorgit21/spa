@@ -68,18 +68,31 @@ class _PraPatraFormB extends State<PraPatraFormB> {
     // Formatters for English and Marathi
     var englishFormatter = DateFormat('MMMM yyyy', 'en');
     var marathiFormatter = DateFormat('MMMM yyyy', 'mr');
+    // Determine the start of the financial year (April 1st)
+    DateTime financialYearStart;
+    if (now.month < 4) {
+      // If before April, start from April of the previous year
+      financialYearStart = DateTime(now.year - 1, 4);
+    } else {
+      // Otherwise, start from April of the current year
+      financialYearStart = DateTime(now.year, 4);
+    }
 
+    // Populate months for the financial year (April to March)
     for (int i = 0; i < 12; i++) {
-      DateTime month = DateTime(now.year, now.month + i);
+      DateTime month =
+          DateTime(financialYearStart.year, financialYearStart.month + i);
       monthsList.add(englishFormatter.format(month)); // English format
       _monthsListMarathi.add(marathiFormatter.format(month)); // Marathi format
     }
-
+    String currentMonthEnglish = englishFormatter.format(now);
+    int currentMonthIndex = monthsList.indexOf(currentMonthEnglish);
     setState(() {
       _months = monthsList; // Months in English
-      _selectedMonth = _months[0]; // Default selection in English
-      _selectedMonthMarathi =
-          _monthsListMarathi[0]; // Default selection in Marathi
+      _selectedMonth =
+          _months[currentMonthIndex]; // Set the current month (English)
+      _selectedMonthMarathi = _monthsListMarathi[
+          currentMonthIndex]; // Set the current month (Marathi)
     });
   }
 

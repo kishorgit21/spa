@@ -10,6 +10,8 @@ class Config {
   static String get contact => dotenv.env['CONTACT'] ?? '';
   static String get email => dotenv.env['EMAIL'] ?? '';
   static int get amount => int.tryParse(dotenv.env['AMOUNT'] ?? '0') ?? 0;
+  static String get spaBaseUrl => dotenv.env['SPABASE_URL'] ?? '';
+  static String get spaUserEndPoint => dotenv.env['SPAUSEREENDPOINT'] ?? '';
 
   static Map<String, String> getHeaders() {
     final credentials = '$razorpayApiKey:$razorpayApiSecret';
@@ -17,6 +19,9 @@ class Config {
     return {
       'Content-Type': 'application/json',
       'Authorization': 'Basic $encodedCredentials',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
     };
   }
 }

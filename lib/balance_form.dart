@@ -16,6 +16,7 @@ class _BalanceFormState extends State<BalanceForm> {
   List<Map<String, dynamic>> _items = [];
   final List<String> classes = ['१ ते ५', '६ ते ८']; // Class options
   String? _selectedClass; // To store the selected class
+  bool isReadOnly = false;
   @override
   void initState() {
     super.initState();
@@ -41,13 +42,20 @@ class _BalanceFormState extends State<BalanceForm> {
       List<Map<String, dynamic>> rows =
           await DatabaseHelper.instance.getLastOpeningStock(selectedClass);
       if (rows.isNotEmpty) {
-        for (var row in rows) {
-          int index =
-              _items.indexWhere((item) => item['itemid'] == row['itemid']);
-          if (index != -1) {
-            _controllers[index].text = row['weight'].toString();
+        List<Map<String, dynamic>> first15Rows =
+            rows.length > 15 ? rows.sublist(0, 15) : rows;
+
+        // Update state variables within setState
+        setState(() {
+          isReadOnly = rows.length > 15;
+          for (var row in first15Rows) {
+            int index =
+                _items.indexWhere((item) => item['itemid'] == row['itemid']);
+            if (index != -1) {
+              _controllers[index].text = row['weight'].toString();
+            }
           }
-        }
+        });
         print(rows);
       } else {
         clearFields();
@@ -62,6 +70,7 @@ class _BalanceFormState extends State<BalanceForm> {
       for (var controller in _controllers) {
         controller.clear(); // Clear each TextField's text
       }
+      isReadOnly = false;
     });
   }
 
@@ -156,6 +165,7 @@ class _BalanceFormState extends State<BalanceForm> {
                             flex: 3,
                             child: TextFormField(
                               controller: _controllers[index],
+                              readOnly: isReadOnly,
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'वजन (kg)',
@@ -184,7 +194,7 @@ class _BalanceFormState extends State<BalanceForm> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _saveData,
+                onPressed: isReadOnly ? null : _saveData,
                 style: ElevatedButton.styleFrom(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 32, vertical: 16),

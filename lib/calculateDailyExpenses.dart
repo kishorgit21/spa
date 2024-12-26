@@ -118,8 +118,10 @@ class CalculateDailyExpenses {
     try {
       openingBalance = await DatabaseHelper.instance
           .getOpeningStock(selectedClass, selectedMonth);
+
       currentBalance = await DatabaseHelper.instance
           .getAllRiceGrainRecord(selectedClass, selectedMonth);
+
       if (openingBalance.isEmpty || currentBalance.isEmpty) {
         logMessage("No data available for balanceTotal.");
         return [];

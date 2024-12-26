@@ -62,7 +62,7 @@ class _RiceGrainRecordFormState extends State<RiceGrainRecordForm> {
       context: context,
       initialDate: DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime(2101),
+      lastDate: DateTime.now(), //DateTime(2101),
     );
     // if (picked != null && picked != _selectedDate) {
     //   setState(() {
@@ -132,7 +132,7 @@ class _RiceGrainRecordFormState extends State<RiceGrainRecordForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('प्राप्त तांदूळ व धान्य नोंद'),
+        title: const Text('प्राप्त धान्य नोंद'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

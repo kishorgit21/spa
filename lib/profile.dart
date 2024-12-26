@@ -3,14 +3,12 @@ import 'package:intl/intl.dart';
 import 'database_helper.dart';
 import 'package:spa/SPAUserModel.dart';
 import 'package:spa/logToFile.dart';
-import 'package:android_id/android_id.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:io'; // Required to check platform
 import 'package:spa/main.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'dart:math';
 import 'package:spa/order_api.dart';
 import 'package:spa/api_services.dart';
+import 'package:spa/deviceInfo.dart';
 
 class ProfileForm extends StatefulWidget {
   const ProfileForm({super.key});
@@ -60,7 +58,7 @@ class _ProfileFormState extends State<ProfileForm> {
     try {
       List<Map<String, dynamic>> rows =
           await DatabaseHelper.instance.getProfiles();
-      if (rows.isNotEmpty && rows.isNotEmpty) {
+      if (rows.isNotEmpty) {
         // Assuming there's only one profile to load (as the profile form is for a single profile)
         var row = rows.first;
         _Id = row['id'] ?? '';
@@ -144,7 +142,7 @@ class _ProfileFormState extends State<ProfileForm> {
     try {
       if (_formKey.currentState?.validate() ?? false) {
         // logMessage("start deviceid lookup");
-        _deviceId = await _getDeviceId();
+        _deviceId = await Deviceinfo.getDeviceId();
 
         SPAUserModel user = SPAUserModel(
           deviceid: _deviceId,
@@ -360,25 +358,25 @@ class _ProfileFormState extends State<ProfileForm> {
         .trim();
   }
 
-  Future<String?> _getDeviceId() async {
-    try {
-      var deviceInfo = DeviceInfoPlugin();
-      if (Platform.isIOS) {
-        // iOS-specific code
-        var iosDeviceInfo = await deviceInfo.iosInfo;
-        return iosDeviceInfo.identifierForVendor; // Unique ID on iOS
-      } else if (Platform.isAndroid) {
-        // Android-specific code
-        var androidDeviceInfo = await deviceInfo.androidInfo;
-        return const AndroidId().getId(); // Unique ID on Android
-      }
-      return null; // Return null if neither Android nor iOS
-    } catch (e) {
-      logMessage("Failed to get device ID:: $e");
-    }
+  // static Future<String?> getDeviceId() async {
+  //   try {
+  //     var deviceInfo = DeviceInfoPlugin();
+  //     if (Platform.isIOS) {
+  //       // iOS-specific code
+  //       var iosDeviceInfo = await deviceInfo.iosInfo;
+  //       return iosDeviceInfo.identifierForVendor; // Unique ID on iOS
+  //     } else if (Platform.isAndroid) {
+  //       // Android-specific code
+  //       var androidDeviceInfo = await deviceInfo.androidInfo;
+  //       return const AndroidId().getId(); // Unique ID on Android
+  //     }
+  //     return null; // Return null if neither Android nor iOS
+  //   } catch (e) {
+  //     logMessage("Failed to get device ID:: $e");
+  //   }
 
-    return null; // Return an empty string if unable to fetch the ID
-  }
+  //   return null; // Return an empty string if unable to fetch the ID
+  // }
 
   @override
   Widget build(BuildContext context) {

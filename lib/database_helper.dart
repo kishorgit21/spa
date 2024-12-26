@@ -266,7 +266,7 @@ class DatabaseHelper {
     var englishFormatter = DateFormat('MMMM yyyy', 'en');
     DateTime date = DateTime.parse(
         selecteddate); // Parse the date string to a DateTime object
-    DateTime month = DateTime(date.year, date.month + 1); // Increment month
+    DateTime month = DateTime(date.year, date.month); // Increment month
     String selectedMonth = englishFormatter.format(month); // Ensure `englis
 
     List<Map<String, dynamic>> existingRecord =
@@ -282,13 +282,16 @@ class DatabaseHelper {
           );
         }
       } else {
+        String? currentDate = existingRecord.first['created_date'].toString();
+
         // Update the existing record for this class
         for (var record in records) {
           await txn.update(
             'OpeningStock',
             record,
-            where: 'class = ? AND itemid = ?', // Update based on the class
-            whereArgs: [classValue, record.values.elementAt(1)],
+            where:
+                'class = ? AND itemid = ? AND created_date = ?', // Update based on the class
+            whereArgs: [classValue, record.values.elementAt(1), currentDate],
           );
         }
       }
@@ -326,7 +329,7 @@ class DatabaseHelper {
       FROM OpeningStock
       WHERE class = ?
       ORDER BY created_date DESC
-      LIMIT 15
+      LIMIT 30
     ''', [selectedClass]);
   }
 
@@ -354,11 +357,22 @@ class DatabaseHelper {
     String startDate = dates?['startDate'] ?? '';
     String endDate = dates?['endDate'] ?? '';
 
-    return await db.query(
+    // return await db.query(
+    //   'RiceGrainRecord',
+    //   where: "class = ? AND date(received_date) BETWEEN ? AND ?",
+    //   whereArgs: [selectedClass, startDate, endDate],
+    // );
+    // Query the database
+    final result = await db.query(
       'RiceGrainRecord',
       where: "class = ? AND date(received_date) BETWEEN ? AND ?",
       whereArgs: [selectedClass, startDate, endDate],
     );
+
+    if (result.isEmpty) {
+      return generateDynamicList(selectedClass, startDate);
+    }
+    return result;
   }
 
   Future<List<Map<String, dynamic>>> getRiceGrainRecord(
@@ -403,6 +417,7 @@ class DatabaseHelper {
     WHERE 
       date(substr(date, 7, 4) || '-' || substr(date, 4, 2) || '-' || substr(date, 1, 2)) 
       BETWEEN ? AND ?
+      ORDER BY date ASC
   ''', [startDate, endDate]);
   }
 
@@ -420,16 +435,7 @@ class DatabaseHelper {
       whereArgs: [selectedDate, selectedDay, selectedClass],
     );
   }
-// Future<List<Map<String, dynamic>>> getRiceGrainRecordByDate(String selectedDate) async {
-//   final db = await database;
 
-//   // Query records where the received_date matches the selected date
-//   return await db.query(
-//     'RiceGrainRecord',
-//     where: 'received_date = ?',
-//     whereArgs: [selectedDate],
-//   );
-//}
   Future<List<Map<String, dynamic>>> getRiceGrainsPerStudentRecord(
       String? selectedClass) async {
     final db = await database;
@@ -569,6 +575,25 @@ class DatabaseHelper {
       throw Exception(
           "Invalid input. Please provide input in 'Month Year' format.");
     }
+  }
+
+  Future<List<Map<String, dynamic>>> generateDynamicList(
+      String? className, String? startDate) async {
+    List<Map<String, dynamic>> items =
+        await DatabaseHelper.instance.getElements();
+    List<Map<String, dynamic>> dynamicList = [];
+    for (var item in items) {
+      dynamicList.add({
+        "id": item["itemid"], // Use itemid as id
+        "class": className,
+        "itemid": item["itemid"],
+        "name": item["name"],
+        "weight": 0, // Set default weight to 0
+        "created_date": startDate,
+      });
+    }
+
+    return dynamicList;
   }
 
   Future close() async {
