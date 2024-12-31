@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:spa/monthlyreportselection.dart';
-import 'package:spa/PraPatraFormB.dart';
+import 'package:spa/yearlyreportselection.dart';
 
-class MonthlyReportForm extends StatelessWidget {
-  const MonthlyReportForm({super.key});
+class YearlyReportForm extends StatelessWidget {
+  const YearlyReportForm({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -14,15 +13,10 @@ class MonthlyReportForm extends StatelessWidget {
       mainAxisSpacing: 16.0,
       children: [
         _buildGridItem(
-          Icons.book, // Replace with appropriate icon
-          'Monthly Report Type A',
+          Icons.pie_chart, // Updated icon for Yearly Report
+          'वार्षिक अहवाल',
           context,
         ),
-        _buildGridItem(
-          Icons.book_outlined,
-          'Monthly Report Type B',
-          context,
-        )
       ],
     );
   }
@@ -30,15 +24,11 @@ class MonthlyReportForm extends StatelessWidget {
   Widget _buildGridItem(IconData icon, String title, BuildContext context) {
     return GestureDetector(
       onTap: () {
-        if (title == 'Monthly Report Type A') {
+        if (title == 'वार्षिक अहवाल') {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => const MdmRegExportForm()),
-          );
-        } else if (title == 'Monthly Report Type B') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const PraPatraFormB()),
+            MaterialPageRoute(
+                builder: (context) => const YearlyReportSelection()),
           );
         }
       },

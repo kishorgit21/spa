@@ -361,7 +361,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
       List<Map<String, dynamic>> openingStock =
           await DatabaseHelper.instance.getLastOpeningStock(selectedClass);
 
-      if (perStudentRecord.isNotEmpty && openingStock.isNotEmpty) {
+      if (perStudentRecord.isNotEmpty || openingStock.isNotEmpty) {
         return true;
       }
     } catch (error) {
@@ -482,7 +482,11 @@ class _AttendanceFormState extends State<AttendanceForm> {
                 const SizedBox(height: 16),
                 _buildTextField(patController, 'पट'),
                 const SizedBox(height: 16),
-                _buildTextField(totalController, 'उपस्थिती'),
+                _buildTextField(
+                  totalController,
+                  'उपस्थिती',
+                  dependentControllerValue: patController.text,
+                ),
                 Wrap(
                   spacing: 10.0,
                   children: [
@@ -544,7 +548,7 @@ class _AttendanceFormState extends State<AttendanceForm> {
   }
 
   Widget _buildTextField(TextEditingController controller, String labelText,
-      {bool readOnly = false}) {
+      {bool readOnly = false, String? dependentControllerValue}) {
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.number,
@@ -558,6 +562,10 @@ class _AttendanceFormState extends State<AttendanceForm> {
           return '$labelText आवश्यक आहे';
         } else if (!readOnly && int.tryParse(value) == null) {
           return 'कृपया एक वैध संख्या प्रविष्ट करा';
+        } else if (labelText == 'उपस्थिती' &&
+            dependentControllerValue != null &&
+            int.tryParse(value)! > int.tryParse(dependentControllerValue)!) {
+          return 'उपस्थिती पट पेक्षा जास्त असू शकत नाही';
         }
         return null;
       },

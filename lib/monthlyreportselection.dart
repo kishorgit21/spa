@@ -25,6 +25,7 @@ class MdmRegExportFormState extends State<MdmRegExportForm> {
   List<String> _previousReports = []; // List to hold previous reports
   String filePath = '';
   String _schoolName = '';
+  String _financialYear = '';
 
   final largeFontStyle = excel.CellStyle(
     fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
@@ -116,6 +117,16 @@ class MdmRegExportFormState extends State<MdmRegExportForm> {
       _selectedMonthMarathi = _monthsListMarathi[
           currentMonthIndex]; // Set the current month (Marathi)
     });
+  }
+
+  String getFinancialYear(String dateStr) {
+    DateTime date = DateFormat('MMMM yyyy', 'en').parse(dateStr);
+    int year = date.year;
+    if (date.month >= 4) {
+      return '$year-${year + 1}';
+    } else {
+      return '${year - 1}-$year';
+    }
   }
 
   Future<String> SchoolName() async {
@@ -213,7 +224,7 @@ class MdmRegExportFormState extends State<MdmRegExportForm> {
 
     // Header for both sheets
     String headerTitle =
-        "शालेय पोषण आहार इयत्ता ${sheet.sheetName} दैनंदिन खर्चाची नोंदवही सन 2023/2024";
+        "शालेय पोषण आहार इयत्ता ${sheet.sheetName} दैनंदिन खर्चाची नोंदवही सन ${_financialYear}";
     String schoolName = "शाळेचे नाव : ${await SchoolName()}";
 
     sheet.cell(excel.CellIndex.indexByString("A1"))
@@ -505,7 +516,8 @@ class MdmRegExportFormState extends State<MdmRegExportForm> {
           .where((file) =>
               file is File &&
               file.path.endsWith('.xlsx') &&
-              !file.path.contains('PraPatraB')) // Check for Excel files
+              !file.path.contains('PraPatraB') &&
+              !file.path.contains('MDMAUDIT')) // Check for Excel files
           .map((file) => file.path)
           .toList();
 
@@ -553,6 +565,7 @@ class MdmRegExportFormState extends State<MdmRegExportForm> {
                       _selectedMonth = newValue!;
                       int selectedIndex = _months.indexOf(newValue);
                       _selectedMonthMarathi = _monthsListMarathi[selectedIndex];
+                      _financialYear = getFinancialYear(_selectedMonth);
                     });
                   },
                   items: _months.map<DropdownMenuItem<String>>((String month) {

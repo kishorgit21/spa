@@ -273,7 +273,8 @@ class DatabaseHelper {
         await getOpeningStock(classValue, selectedMonth);
 
     await db.transaction((txn) async {
-      if (existingRecord.isEmpty) {
+      if (existingRecord.isEmpty ||
+          existingRecord.every((record) => record['weight'] == 0)) {
         for (var record in records) {
           await txn.insert(
             'OpeningStock',
@@ -343,11 +344,15 @@ class DatabaseHelper {
     String startDate = dates?['startDate'] ?? '';
     String endDate = dates?['endDate'] ?? '';
 
-    return await db.query(
+    final result = await db.query(
       'OpeningStock',
       where: "class = ? AND date(created_date) BETWEEN ? AND ?",
       whereArgs: [selectedClass, startDate, endDate],
     );
+    if (result.isEmpty) {
+      return generateDynamicList(selectedClass, startDate);
+    }
+    return result;
   }
 
   Future<List<Map<String, dynamic>>> getAllRiceGrainRecord(

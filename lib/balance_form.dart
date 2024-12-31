@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'database_helper.dart';
 import 'package:spa/logToFile.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
+
+void main() {
+  DateTime now = DateTime.now();
+  DateTime aprilFirst = DateTime(now.year, 4, 1);
+  String formattedDate = DateFormat('yyyy-MM-dd').format(aprilFirst);
+  print(formattedDate); // Output: 2024-04-01
+}
 
 class BalanceForm extends StatefulWidget {
   const BalanceForm({super.key});
@@ -78,7 +86,10 @@ class _BalanceFormState extends State<BalanceForm> {
     try {
       if (_formKey.currentState?.validate() ?? false) {
         List<Map<String, dynamic>> records = [];
-        String currentDate = DateTime.now().toString();
+        //String currentDate = DateTime.now().toString();
+        DateTime now = DateTime.now();
+        DateTime aprilFirst = DateTime(now.year, 4, 1);
+        String currentDate = DateFormat('yyyy-MM-dd').format(aprilFirst);
         for (int i = 0; i < _items.length; i++) {
           String weight = _controllers[i].text;
           records.add({
@@ -115,7 +126,17 @@ class _BalanceFormState extends State<BalanceForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('आरंभीची शिल्लक नोंदवा'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('आरंभीची शिल्लक नोंदवा'), // Main title
+            SizedBox(height: 4), // Spacing between the texts
+            Text(
+              '(एप्रिल महिन्याची आरंभी शिल्लक)', // Additional text
+              style: TextStyle(fontSize: 14, color: Colors.white70),
+            ),
+          ],
+        ),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),

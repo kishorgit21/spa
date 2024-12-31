@@ -8,16 +8,19 @@ import 'package:spa/logToFile.dart';
 import 'package:open_file/open_file.dart';
 import 'database_helper.dart';
 import 'package:spa/excel_utils.dart';
+
 //import 'package:flutter/src/painting/box_border.dart';
 
-class PraPatraFormB extends StatefulWidget {
-  const PraPatraFormB({super.key});
+class YearlyReportSelection extends StatefulWidget {
+  const YearlyReportSelection({super.key});
 
   @override
-  _PraPatraFormB createState() => _PraPatraFormB();
+  YearlyReportSelectionState createState() => YearlyReportSelectionState();
 }
 
-class _PraPatraFormB extends State<PraPatraFormB> {
+class YearlyReportSelectionState extends State<YearlyReportSelection> {
+  String _selectedFinancialYear = '';
+  List<String> _financialYears = [];
   String _selectedMonth = '';
   String _selectedMonthMarathi = '';
   List<String> _months = [];
@@ -25,58 +28,50 @@ class _PraPatraFormB extends State<PraPatraFormB> {
   List<String> _previousReports = []; // List to hold previous reports
   String filePath = '';
   String _schoolName = '';
-  final globalData = GlobalData();
-
-  final largeFontStyle = excel.CellStyle(
-    fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-    fontSize: 18,
-    bold: true, // Optional, if you want large fonts to be bold
-    horizontalAlign:
-        excel.HorizontalAlign.Center, // Align text horizontally to center
-    verticalAlign: excel.VerticalAlign.Center,
-  );
-  final boldStyle = excel.CellStyle(
-    fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-    bold: true,
-    fontSize: 12,
-  );
-
-  final totalItemsboldStyle = excel.CellStyle(
-    fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-    fontSize: 12,
-    bold: true,
-    horizontalAlign: excel.HorizontalAlign.Right, // Right align numbers
-    verticalAlign: excel.VerticalAlign.Center,
-  );
-  final defaultStyle = excel.CellStyle(
-    fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-  );
+  String _financialYearInMarathi = '';
 
   @override
   void initState() {
     super.initState();
+    _populateFinancialYears();
+
     _populateMonths();
     _loadAllExcelFiles();
   }
 
+// Populate financial years
+  void _populateFinancialYears() {
+    DateTime now = DateTime.now();
+    int startYear = now.year - 1; // Start from 5 years ago
+    int endYear = now.year + 3; // End 5 years into the future
+
+    List<String> financialYears = [];
+    for (int year = startYear; year <= endYear; year++) {
+      String financialYear = "April $year - March ${year + 1}";
+      financialYears.add(financialYear);
+    }
+
+    setState(() {
+      _financialYears = financialYears;
+      _selectedFinancialYear = financialYears[0]; // Default to the first year
+    });
+  }
+
   // Dynamically populate months
   void _populateMonths() {
+    if (_selectedFinancialYear.isEmpty) return;
     DateTime now = DateTime.now();
     List<String> monthsList = [];
-    //List<String> monthsListMarathi = [];
+    _monthsListMarathi.clear();
 
-    // Formatters for English and Marathi
     var englishFormatter = DateFormat('MMMM yyyy', 'en');
     var marathiFormatter = DateFormat('MMMM yyyy', 'mr');
-    // Determine the start of the financial year (April 1st)
-    DateTime financialYearStart;
-    if (now.month < 4) {
-      // If before April, start from April of the previous year
-      financialYearStart = DateTime(now.year - 1, 4);
-    } else {
-      // Otherwise, start from April of the current year
-      financialYearStart = DateTime(now.year, 4);
-    }
+
+    // Extract start year from the selected financial year
+    int startYear = int.parse(_selectedFinancialYear.split(' ')[1]);
+    _financialYearInMarathi = getFinancialYearInMarathi(_selectedFinancialYear);
+    // Start from April of the selected year
+    DateTime financialYearStart = DateTime(startYear, 4);
 
     // Populate months for the financial year (April to March)
     for (int i = 0; i < 12; i++) {
@@ -85,22 +80,40 @@ class _PraPatraFormB extends State<PraPatraFormB> {
       monthsList.add(englishFormatter.format(month)); // English format
       _monthsListMarathi.add(marathiFormatter.format(month)); // Marathi format
     }
-    String currentMonthEnglish = englishFormatter.format(now);
-    int currentMonthIndex = monthsList.indexOf(currentMonthEnglish);
+
+    // Set the current month dynamically
+    DateTime nowdt = DateTime.now();
+    String currentMonthEnglish = englishFormatter.format(nowdt);
+    int currentMonthIndex = monthsList.contains(currentMonthEnglish)
+        ? monthsList.indexOf(currentMonthEnglish)
+        : 0;
+
     setState(() {
-      _months = monthsList; // Months in English
-      _selectedMonth =
-          _months[currentMonthIndex]; // Set the current month (English)
-      _selectedMonthMarathi = _monthsListMarathi[
-          currentMonthIndex]; // Set the current month (Marathi)
+      _months = monthsList;
+      _selectedMonth = _months[currentMonthIndex];
+      _selectedMonthMarathi = _monthsListMarathi[currentMonthIndex];
     });
+  }
+
+  String getFinancialYearInMarathi(String financialYear) {
+    // Extract the start year and end year from the financial year string
+    int startYear = int.parse(financialYear.split(' ')[1]); // Extract 2024
+    int endYear = int.parse(financialYear.split(' ')[4]); // Extract 2025
+
+    // Convert the years to Marathi format
+    var marathiFormatter = DateFormat('yyyy', 'mr');
+    String startYearMarathi = marathiFormatter.format(DateTime(startYear));
+    String endYearMarathi = marathiFormatter.format(DateTime(endYear));
+
+    // Combine the years in Marathi format
+    return '$startYearMarathi - $endYearMarathi';
   }
 
   Future<String> SchoolName() async {
     try {
       List<Map<String, dynamic>> rows =
           await DatabaseHelper.instance.getProfiles();
-      if (rows.isNotEmpty && rows.isNotEmpty) {
+      if (rows.isNotEmpty) {
         var row = rows.first;
         _schoolName = row['schoolName'] ?? '';
       }
@@ -113,42 +126,89 @@ class _PraPatraFormB extends State<PraPatraFormB> {
   // Function to create the Excel file and return the file path
   Future<String> createExcelFile() async {
     try {
+      List<String> selectedMonths = _months;
+      List<String>? selectedDataMonths = [];
+      List<Map<String, dynamic>> allDailyExpenses = [];
       CalculateDailyExpenses calculateDailyExpenses =
           const CalculateDailyExpenses();
-      List<Map<String, dynamic>> dailyExpenses =
-          await calculateDailyExpenses.calculateDailyExpenses(_selectedMonth);
+      // List<Map<String, dynamic>> dailyExpenses =
+      //     await calculateDailyExpenses.calculateDailyExpenses(_selectedMonth);
 
-      if (dailyExpenses.isEmpty) {
+      for (String month in selectedMonths) {
+        // Call calculateDailyExpenses for each month individually
+        List<Map<String, dynamic>> monthlyExpenses =
+            await calculateDailyExpenses.calculateDailyExpenses(month);
+
+        if (monthlyExpenses.isEmpty) {
+          continue;
+        } else {
+          selectedDataMonths.add(month);
+        }
+        // Add the month name to each entry in monthlyExpenses
+        for (var expense in monthlyExpenses) {
+          expense["month"] = month; // Add the month name to each expense entry
+        }
+
+        // Add the fetched monthly expenses to the consolidated list
+        allDailyExpenses.addAll(monthlyExpenses);
+      }
+
+      if (allDailyExpenses.isEmpty) {
         return "";
       }
 
+      // Create a map to store expenses grouped by month
+      Map<String, List<Map<String, dynamic>>> groupedExpenses = {};
+
+      // Group expenses by month
+      for (String month in selectedDataMonths) {
+        // Filter expenses for the current month
+        List<Map<String, dynamic>> monthlyExpenses =
+            allDailyExpenses.where((data) {
+          return data["month"] == month; // Filter by month
+        }).toList();
+
+        // Add the month's expenses to the map
+        groupedExpenses[month] = monthlyExpenses;
+      }
+
       var excelFile = excel.Excel.createExcel();
-      //  excelFile.delete('Sheet1'); // Remove the default sheet`
+      excelFile.delete('Sheet1'); // Remove the default sheet
+      Map<String, List<Map<String, dynamic>>> filteredExpensesgroup1to5 = {};
+      Map<String, List<Map<String, dynamic>>> filteredExpensesgroup6to8 = {};
 
       // Filter dailyExpenses into two groups
-      List<Map<String, dynamic>> group1to5 = dailyExpenses
-          .where((data) => data["class"] == "१ ते ५" && data["itemName"] != '')
-          .toList();
-      List<Map<String, dynamic>> group6to8 = dailyExpenses
-          .where((data) => data["class"] == "६ ते ८" && data["itemName"] != '')
-          .toList();
+      groupedExpenses.forEach((key, value) {
+        filteredExpensesgroup1to5[key] = value.where((item) {
+          String classValue =
+              item["class"].toString().trim(); // Normalize the value
+          return classValue == "१ ते ५" &&
+              item["itemName"].toString().trim() != '';
+        }).toList();
+      });
+      groupedExpenses.forEach((key, value) {
+        filteredExpensesgroup6to8[key] = value.where((item) {
+          String classValue =
+              item["class"].toString().trim(); // Normalize the value
+          return classValue == "६ ते ८" &&
+              item["itemName"].toString().trim() != '';
+        }).toList();
+      });
 
-      if (group1to5.isNotEmpty) {
-        globalData.totalGroupedSums = 0;
-        globalData.totalFoodDays = 0;
+      if (filteredExpensesgroup1to5.isNotEmpty) {
         var sheet1 = excelFile['१ ते ५'];
-        await populateSheet(sheet1, group1to5, calculateDailyExpenses);
+        await populateSheet(
+            sheet1, filteredExpensesgroup1to5, calculateDailyExpenses);
       }
-      if (group6to8.isNotEmpty) {
-        globalData.totalGroupedSums = 0;
-        globalData.totalFoodDays = 0;
-        var sheet2 = excelFile['६ ते ८'];
-        await populateSheet(sheet2, group6to8, calculateDailyExpenses);
+      if (filteredExpensesgroup6to8.isNotEmpty) {
+        var sheet1 = excelFile['६ ते ८'];
+        await populateSheet(
+            sheet1, filteredExpensesgroup6to8, calculateDailyExpenses);
       }
 
-      //Save the file
+      // Save the file
       final directory = await getApplicationDocumentsDirectory();
-      filePath = '${directory.path}/monthly_PraPatraB_$_selectedMonth.xlsx';
+      filePath = '${directory.path}/MDMAUDIT$_financialYearInMarathi.xlsx';
       File(filePath)
         ..createSync(recursive: true)
         ..writeAsBytesSync(excelFile.encode()!);
@@ -164,190 +224,114 @@ class _PraPatraFormB extends State<PraPatraFormB> {
 
   Future<void> populateSheet(
     excel.Sheet sheet,
-    List<Map<String, dynamic>> data,
+    Map<String, List<Map<String, dynamic>>> data,
     CalculateDailyExpenses calculateDailyExpenses,
   ) async {
     try {
-      var result = await ExcelUtils.populateSheetData(
-          sheet.sheetName, data, calculateDailyExpenses, _selectedMonth);
-      if (result.isEmpty) return;
+      List<dynamic> headerRow = [
+        'अ. क्र',
+        '',
+      ]; // First column+ for serial number and empty column for महिना
+      List<dynamic> subHeaderRow = [
+        '',
+        'महिना',
+      ];
+
       String schoolName = "शाळेचे नाव : ${await SchoolName()}";
 
       sheet.cell(excel.CellIndex.indexByString("B1"))
-        ..value = 'शालेय पोषण आहार (प्रपत्र ब) इयत्ता ${sheet.sheetName}'
-        ..cellStyle = largeFontStyle;
+        ..value =
+            'शालेय पोषण आहार योजना वार्षिक उपयोगिता प्रमाणपत्र सन ${_financialYearInMarathi}';
+      //..cellStyle = largeFontStyle;
       sheet.merge(excel.CellIndex.indexByString("B1"),
           excel.CellIndex.indexByString("H1"));
 
       // Set up the second row for school, center, and month details (row 2)
-      sheet.cell(excel.CellIndex.indexByString("B2"))
-        ..value = schoolName
-        ..cellStyle = largeFontStyle;
+      sheet.cell(excel.CellIndex.indexByString("B2"))..value = schoolName;
+      //..cellStyle = largeFontStyle;
 
-      sheet.cell(excel.CellIndex.indexByString("E2"))
-        ..value = 'केंद्र : XXX'
-        ..cellStyle = largeFontStyle;
+      sheet.cell(excel.CellIndex.indexByString("G2"))..value = 'केंद्र : XXX';
+      //..cellStyle = largeFontStyle;
 
-      sheet.cell(excel.CellIndex.indexByString("H2"))
-        ..value = 'महिना: $_selectedMonthMarathi'
-        ..cellStyle = largeFontStyle;
-      // Apply values and bold style to cells
-      sheet.cell(excel.CellIndex.indexByString("A3"))
-        ..value = 'एकूण पट संख्या :'
-        ..cellStyle = boldStyle;
-      sheet.cell(excel.CellIndex.indexByString("B3"))
-        ..value = '0'
-        ..cellStyle = boldStyle;
-      sheet.cell(excel.CellIndex.indexByString("D3"))
-        ..value = 'महिन्यातील एकूण उपस्थिती संख्या :'
-        ..cellStyle = boldStyle;
-      // sheet.cell(excel.CellIndex.indexByString("E3")).value =
-      //     globalData.totalGroupedSums / globalData.totalFoodDays;
-      sheet.cell(excel.CellIndex.indexByString("G3"))
-        ..value = 'कामाचे एकूण दिवस :'
-        ..cellStyle = boldStyle;
-      // sheet.cell(excel.CellIndex.indexByString("H3")).value =
-      //     globalData.totalFoodDays;
+      sheet.cell(excel.CellIndex.indexByString("K2"))
+        ..value = 'इयत्ता: ${sheet.sheetName}';
+      //..cellStyle = largeFontStyle;
+      int id = 1;
+      //bool headersAdded = false;
+      final itemNames = await DatabaseHelper.instance.getElements();
+      var itemNamesList = null;
 
-      // // Add column headers (row 4)
-
-      final itemNames = <String>{};
-      for (var dayData in data) {
-        for (var item in dayData['expenses']) {
-          itemNames.add(item['itemname']);
-        }
-      }
-      final List<String> headers = [
-        'अ. सं.',
-        'वस्तुचे नाव',
-        'मागील शिल्लक वस्तु (कि.ग्रॅम)',
-        'चालु महा. प्राप्त वस्तु (कि.ग्रॅम)',
-        'एकूण वस्तु (कि.ग्रॅम)',
-        'अन्न शिजवण्यासाठी वापरलेल्या वस्तु (कि.ग्रॅम)',
-        'शिल्लक वस्तु (कि.ग्रॅम)',
-        'एकूण ताटे',
-        //'शेरा',
-      ];
-
-      for (int i = 0; i < headers.length; i++) {
-        var cell = sheet.cell(
-            excel.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 3));
-        cell.value = headers[i];
-        cell.cellStyle = excel.CellStyle(
-            bold: true,
-            fontSize: 12,
-            fontFamily: excel.getFontFamily(excel.FontFamily.Calibri));
-      }
-      final filterDays = [
-        "सोमवार",
-        "मंगळवार",
-        "बुधवार",
-        "गुरुवार",
-        "शुक्रवार",
-        "शनिवार",
-        "रविवार"
-      ];
-      final filteredDays = result.where((row) {
-        if (row.isEmpty) return false; // Skip empty rows
-        return row.isNotEmpty &&
-            filterDays.any((keyword) => row[0].toString().contains(keyword));
-      }).toList();
-
-// Group by Row2 (index 1) and sum Row3 (index 2)
-      Map<String, int> groupedSums = {};
-
-      for (var data in filteredDays) {
-        final key = data[1]?.toString(); // Access the itemname
-        final value = data[2]?.toInt(); // Access the quantity
-        if (key is String && value is int) {
-          groupedSums[key] = (groupedSums[key] ?? 0) + value;
-        }
-      }
-
-      if (filteredDays.isNotEmpty) {
-        globalData.totalFoodDays = filteredDays.length;
-      }
-      if (groupedSums.isNotEmpty) {
-        globalData.totalGroupedSums =
-            groupedSums.values.fold(0, (sum, value) => sum + value);
-      } else {
-        print('groupedSums is null or empty.');
-      }
-
-      final filteredTotals = result.where((row) {
-        final filters = [
-          "मागील शिल्लक",
-          "चालु महा.जमा",
-          "एकुण",
-          "एकुण खर्च",
-          "शिल्लक"
-        ];
-        // Check if the first cell (or any specific cell) contains any of the keywords
-        return row.isNotEmpty &&
-            filters.any((keyword) => row[0].toString().contains(keyword));
-      }).toList();
-
-      final List<List<dynamic>> data1 = [];
-      final itemNamesList = itemNames.toList();
-
+      // Loop through the default items list for headers and subheaders
+      itemNamesList = itemNames.toList();
       for (int i = 0; i < itemNamesList.length; i++) {
-        final firstItem = getValue(filteredTotals[0], 3 + i); // मागील शिल्लक
-        final secondItem = getValue(filteredTotals[1], 3 + i); // चालु महा.जमा
-        final thirdItem = getValue(filteredTotals[2], 3 + i); // एकुण
-        final forthItem = getValue(filteredTotals[3], 3 + i); // एकुण खर्च
-        final fifthItem = getValue(filteredTotals[4], 3 + i); // शिल्लक
-        final shera;
-        // Auto-increment ID and prepare values for the row
-        final id = i + 1;
-        final name = itemNamesList[i] ?? '';
-        final previousBalance = firstItem ?? '';
-        final currentReceived = secondItem ?? '';
-        final totalQuantity = thirdItem ?? '';
-        final usedForCooking = forthItem ?? '';
-        final remaining = fifthItem ?? '';
-        if (name == 'तांदूळ') {
-          shera = globalData.totalGroupedSums ?? '';
-        } else {
-          shera = groupedSums[name] ?? '';
-        }
-        // Add to data1 with only selected columns
-        data1.add([
-          id,
-          name,
-          previousBalance,
-          currentReceived,
-          totalQuantity,
-          usedForCooking,
-          remaining,
-          shera,
-        ]);
+        headerRow.add(itemNamesList[i]['name'] ?? '');
+        headerRow.add('');
+        headerRow.add('');
+        headerRow.add('');
+        headerRow.add('');
+
+        subHeaderRow.add('मागील शिल्लक');
+        subHeaderRow.add('चालु महा.जमा');
+        subHeaderRow.add('एकूण');
+        subHeaderRow.add('अन्न शिजवण्यासाठी वापरलेल्या वस्तु');
+        subHeaderRow.add('शिल्लक');
       }
-      sheet.cell(excel.CellIndex.indexByString("E3")).value =
-          globalData.totalGroupedSums / globalData.totalFoodDays;
-      sheet.cell(excel.CellIndex.indexByString("H3")).value =
-          globalData.totalFoodDays;
 
-      // Add data rows
-      for (int i = 0; i < data1.length; i++) {
-        for (int j = 0; j < data1[i].length; j++) {
-          var cell = sheet.cell(
-            excel.CellIndex.indexByColumnRow(rowIndex: i + 4, columnIndex: j),
-          );
+      // Add the merged header row
+      sheet.appendRow(headerRow);
 
-          cell.value = data1[i][j].toString();
-          cell.cellStyle = excel.CellStyle(
-            horizontalAlign: excel.HorizontalAlign.Center,
-            fontSize: 12,
-            fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-          );
-          // Apply style only from the second column onwards
-          if (j > 1) {
-            cell.cellStyle = excel.CellStyle(
-              horizontalAlign: excel.HorizontalAlign.Right,
-              fontSize: 12,
-              fontFamily: excel.getFontFamily(excel.FontFamily.Calibri),
-            );
+      // Add subheaders row
+      sheet.appendRow(subHeaderRow);
+
+      for (var month in data.keys.toSet().toList()) {
+        {
+          //if (id == 3) break;
+
+          final expenses = data[month]!;
+          if (expenses.isEmpty) continue;
+          //print("Item Name: ${expense["itemName"]}");
+          final result = await ExcelUtils.populateSheetData(
+              sheet.sheetName, expenses, calculateDailyExpenses, month);
+
+          //if (result.isEmpty) return;
+
+          final filteredTotals = result.where((row) {
+            final filters = [
+              "मागील शिल्लक",
+              "चालु महा.जमा",
+              "एकुण",
+              "एकुण खर्च",
+              "शिल्लक"
+            ];
+            // Check if the first cell (or any specific cell) contains any of the keywords
+            return row.isNotEmpty &&
+                filters.any((keyword) => row[0].toString().contains(keyword));
+          }).toList();
+
+          List<dynamic> row = [
+            id, // Serial number
+            _monthsListMarathi[_months.indexOf(month)], // Month
+          ];
+
+          for (int i = 0; i < itemNamesList.length; i++) {
+            final previousBalance =
+                getValue(filteredTotals[0], 3 + i); // मागील शिल्लक
+            final currentReceived =
+                getValue(filteredTotals[1], 3 + i); // चालु महा.जमा
+            final totalQuantity = getValue(filteredTotals[2], 3 + i); // एकुण
+            final usedForCooking =
+                getValue(filteredTotals[3], 3 + i); // एकुण खर्च
+            final remaining = getValue(filteredTotals[4], 3 + i); // शिल्लक
+
+            row.add(previousBalance);
+            row.add(currentReceived);
+            row.add(totalQuantity);
+            row.add(usedForCooking);
+            row.add(remaining);
           }
+
+          sheet.appendRow(row);
+          id++;
         }
       }
     } catch (error) {
@@ -355,7 +339,7 @@ class _PraPatraFormB extends State<PraPatraFormB> {
     }
   }
 
-  // Helper function to retrieve the value
+  //Helper function to retrieve the value
   dynamic getValue(List<dynamic> row, int columnIndex) {
     return (row.isNotEmpty && row.length > columnIndex)
         ? row[columnIndex] ?? ''
@@ -455,8 +439,8 @@ class _PraPatraFormB extends State<PraPatraFormB> {
           .where((file) =>
               file is File &&
               file.path.endsWith('.xlsx') &&
-              file.path.contains('PraPatraB') &&
-              !file.path.contains('MDMAUDIT'))
+              !file.path.contains('PraPatraB') &&
+              !file.path.contains('monthly')) // Check for Excel files
           .map((file) => file.path)
           .toList();
 
@@ -473,7 +457,7 @@ class _PraPatraFormB extends State<PraPatraFormB> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Monthly Report Type B'),
+        title: const Text('वार्षिक अहवाल'),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -483,7 +467,7 @@ class _PraPatraFormB extends State<PraPatraFormB> {
             const Padding(
               padding: EdgeInsets.only(bottom: 8.0),
               child: Text(
-                'महिना निवडा:',
+                'वर्ष निवडा:',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
               ),
             ),
@@ -497,20 +481,20 @@ class _PraPatraFormB extends State<PraPatraFormB> {
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   isExpanded: true,
-                  value: _selectedMonth,
+                  value: _selectedFinancialYear, //_selectedMonth,
                   icon: const Icon(Icons.arrow_drop_down),
                   onChanged: (String? newValue) {
                     setState(() {
-                      _selectedMonth = newValue!;
-                      int selectedIndex = _months.indexOf(newValue);
-                      _selectedMonthMarathi = _monthsListMarathi[selectedIndex];
+                      _selectedFinancialYear = newValue!;
+                      _populateMonths();
                     });
                   },
-                  items: _months.map<DropdownMenuItem<String>>((String month) {
+                  items: _financialYears
+                      .map<DropdownMenuItem<String>>((String year) {
                     return DropdownMenuItem<String>(
-                      value: month,
+                      value: year,
                       child: Text(
-                        month,
+                        year,
                         style: const TextStyle(
                             fontSize: 16, color: Colors.black87),
                       ),
@@ -617,33 +601,5 @@ class _PraPatraFormB extends State<PraPatraFormB> {
         ),
       ),
     );
-  }
-}
-
-class GlobalData {
-  // Singleton instance
-  static final GlobalData _instance = GlobalData._internal();
-
-  // Private constructor
-  GlobalData._internal();
-
-  // Factory constructor to return the singleton instance
-  factory GlobalData() => _instance;
-
-  // Private variables
-  int _totalGroupedSums = 0;
-  int _totalFoodDays = 0;
-
-  // Getters
-  int get totalGroupedSums => _totalGroupedSums;
-  int get totalFoodDays => _totalFoodDays;
-
-  // Setters
-  set totalGroupedSums(int value) {
-    _totalGroupedSums = value;
-  }
-
-  set totalFoodDays(int value) {
-    _totalFoodDays = value;
   }
 }

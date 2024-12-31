@@ -15,6 +15,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:spa/api_services.dart';
 import 'package:spa/deviceInfo.dart';
 import 'package:spa/SPAUserModel.dart';
+import 'package:spa/yearlyreport_form.dart';
 
 void main() async {
   // Initialize locale data
@@ -280,11 +281,6 @@ class YearlyReportScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Text(
-        'Yearly Report Screen',
-        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w500),
-      ),
-    );
+    return const YearlyReportForm();
   }
 }
